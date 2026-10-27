@@ -38,12 +38,8 @@ def load_students() -> list[Student]:
 
 def save_students(students: list[Student]):
     df = pd.DataFrame([s.to_dict() for s in students])
+    # Сохраняем в CSV для совместимости
     df.to_csv(CSV_PATH, index=False, encoding="utf-8-sig")
-
-
-st.set_page_config(page_title="Группы учеников", page_icon="📚", layout="wide")
-st.title("📚 Сборка групп учеников")
-
 # Вкладки
 
 mode = st.radio(
@@ -74,13 +70,20 @@ if mode == "➕ Добавить ученика":
                 st.success(f"✅ {name} добавлен(а).")
 
 if mode == "📋 Все ученики":
-    st.subheader("📂 Импорт учеников из CSV")
-    uploaded_file = st.file_uploader("Выберите файл формата .csv", type=["csv"])
+    st.subheader("📂 Импорт учеников из Excel")
+
+    # Загрузка файла Excel
+    uploaded_file = st.file_uploader("Выберите файл формата .xlsx или .csv", type=["xlsx", "csv"])
 
     if uploaded_file is not None:
         if st.button("Загрузить этих учеников в базу"):
             try:
-                df_new = pd.read_csv(uploaded_file, dtype={"grade": int}, encoding="utf-8-sig")
+                # Читаем в зависимости от расширения
+                if uploaded_file.name.endswith(".xlsx"):
+                    df_new = pd.read_excel(uploaded_file, dtype={"grade": int})
+                else:
+                    df_new = pd.read_csv(uploaded_file, dtype={"grade": int}, encoding="utf-8-sig")
+
                 current_students = load_students()
                 added_count = 0
 
@@ -149,14 +152,20 @@ if mode == "📋 Все ученики":
             st.success(f"✅ Сохранено учеников: {len(new_students)}")
             st.rerun()
 
-        # --- Кнопка скачивания резервной копии ---
+        # --- Кнопка скачивания в Excel ---
         st.divider()
-        csv_students = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+
+        # Формируем Excel-файл в памяти
+        import io
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Ученики')
+
         st.download_button(
-            label="⬇️ Скачать список учеников в CSV",
-            data=csv_students,
-            file_name="students_backup.csv",
-            mime="text/csv",
+            label="⬇️ Скачать список учеников в Excel",
+            data=buffer.getvalue(),
+            file_name="students_backup.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 if mode == "🧩 Собрать группы":
     students = load_students()

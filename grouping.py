@@ -27,14 +27,14 @@ def group_students(
         district_key = str(s.district).strip() if strict_district else "*"
         grade_key = s.grade if strict_grade else s.grade // 2
         lang_key = str(s.language).strip()
-
+        
         buckets[(city_key, district_key, grade_key, lang_key)].append(s)
 
     groups = []
     for (city, district, grade_key, language), members in buckets.items():
         common_days = _intersect_days([m.days for m in members])
         unique_tzs = list(set([str(m.timezone).strip() for m in members]))
-
+        
         groups.append({
             "city": city,
             "district": district if district != "*" else "любой",
@@ -53,16 +53,15 @@ def group_students(
 def find_best_splits(students: List[Student], min_days_overlap: int = 1) -> List[Dict]:
     """
     Разбивает учеников на подгруппы так, чтобы охватить ВСЕХ.
-    Теперь учитывает не только дни, но и часовые пояса!
-    В одну подгруппу могут попасть только те, у кого совпадает пояс и есть общий день.
+    Учитывает не только дни, но и часовые пояса (в одной группе только одинаковые пояса).
     """
     results = []
     remaining = list(students)
-
+    
     while remaining:
         best_combo = None
         best_days = []
-
+        
         n = len(remaining)
         for r in range(n, 0, -1):
             for combo in combinations(remaining, r):
@@ -70,7 +69,7 @@ def find_best_splits(students: List[Student], min_days_overlap: int = 1) -> List
                 tzs = set([str(s.timezone).strip() for s in combo])
                 if len(tzs) > 1:
                     continue  # Пропускаем, если пояса разные
-
+                
                 # Проверяем, что есть общие дни
                 common = _intersect_days([s.days for s in combo])
                 if len(common) >= min_days_overlap:
@@ -79,19 +78,16 @@ def find_best_splits(students: List[Student], min_days_overlap: int = 1) -> List
                     break
             if best_combo:
                 break
-
+                
         if best_combo:
             results.append({
                 "students": [s.name for s in best_combo],
                 "days": best_days,
                 "size": len(best_combo),
             })
-            # Убираем этих учеников из общего списка
             for s in best_combo:
                 remaining.remove(s)
         else:
-            # Если никого не смогли объединить (например, у всех разные пояса),
-            # просто выводим каждого по отдельности
             for s in remaining:
                 results.append({
                     "students": [s.name],
@@ -99,5 +95,5 @@ def find_best_splits(students: List[Student], min_days_overlap: int = 1) -> List
                     "size": 1,
                 })
             break
-
+            
     return results

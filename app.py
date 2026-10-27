@@ -80,10 +80,7 @@ if mode == "📋 Все ученики":
     if uploaded_file is not None:
         if st.button("Загрузить этих учеников в базу"):
             try:
-                # Читаем файл
                 df_new = pd.read_csv(uploaded_file, dtype={"grade": int}, encoding="utf-8-sig")
-
-                # Берем текущих учеников и добавляем новых
                 current_students = load_students()
                 added_count = 0
 
@@ -101,7 +98,7 @@ if mode == "📋 Все ученики":
                     added_count += 1
 
                 save_students(current_students)
-                st.session_state.saved_groups = None # Сбрасываем группы, чтобы они пересобрались
+                st.session_state.saved_groups = None
                 st.success(f"✅ Успешно добавлено {added_count} учеников!")
                 st.rerun()
             except Exception as e:
@@ -109,10 +106,9 @@ if mode == "📋 Все ученики":
 
     st.divider()
 
-    # --- Текущий список учеников ---
     students = load_students()
     if not students:
-        st.info("Пока нет учеников.")
+        st.info("Пока нет учеников. Добавьте первого или импортируйте из файла выше.")
     else:
         df = pd.DataFrame([s.to_dict() for s in students])
 
@@ -148,11 +144,20 @@ if mode == "📋 Все ученики":
                     timezone=str(row["timezone"]).strip(),
                 ))
             save_students(new_students)
-            # Сбрасываем память, так как данные изменились
             st.session_state.saved_groups = None
             st.session_state.saved_splits = {}
             st.success(f"✅ Сохранено учеников: {len(new_students)}")
+            st.rerun()
 
+        # --- Кнопка скачивания резервной копии ---
+        st.divider()
+        csv_students = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+        st.download_button(
+            label="⬇️ Скачать список учеников в CSV",
+            data=csv_students,
+            file_name="students_backup.csv",
+            mime="text/csv",
+        )
 if mode == "🧩 Собрать группы":
     students = load_students()
     if not students:

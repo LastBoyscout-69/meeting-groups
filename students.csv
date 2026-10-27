@@ -1,0 +1,6 @@
+﻿name,city,district,grade,language,days,timezone
+Аня,Тверь,юг,11,Английский,"Пн,Ср",Europe/Moscow
+Вася,Тверь,юг,11,Английский,"Ср,Пт",Europe/Moscow
+Петя,Тверь,юг,11,Английский,"Пт,Сб",Asia/Krasnoyarsk
+Саша,Тверь,юг,11,Английский,"Пн,Ср",Europe/Moscow
+Маша,Тверь,юг,11,Английский,"Пн,Ср",Asia/Krasnoyarsk

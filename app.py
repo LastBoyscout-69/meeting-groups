@@ -74,6 +74,42 @@ if mode == "➕ Добавить ученика":
                 st.success(f"✅ {name} добавлен(а).")
 
 if mode == "📋 Все ученики":
+    st.subheader("📂 Импорт учеников из CSV")
+    uploaded_file = st.file_uploader("Выберите файл формата .csv", type=["csv"])
+
+    if uploaded_file is not None:
+        if st.button("Загрузить этих учеников в базу"):
+            try:
+                # Читаем файл
+                df_new = pd.read_csv(uploaded_file, dtype={"grade": int}, encoding="utf-8-sig")
+
+                # Берем текущих учеников и добавляем новых
+                current_students = load_students()
+                added_count = 0
+
+                for _, row in df_new.iterrows():
+                    days = [d.strip() for d in str(row["days"]).split(",") if d.strip()]
+                    current_students.append(Student(
+                        name=str(row["name"]).strip(),
+                        city=str(row["city"]).strip(),
+                        district=str(row["district"]).strip(),
+                        grade=int(row["grade"]),
+                        language=str(row["language"]).strip(),
+                        days=days,
+                        timezone=str(row["timezone"]).strip(),
+                    ))
+                    added_count += 1
+
+                save_students(current_students)
+                st.session_state.saved_groups = None # Сбрасываем группы, чтобы они пересобрались
+                st.success(f"✅ Успешно добавлено {added_count} учеников!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Ошибка чтения файла: {e}")
+
+    st.divider()
+
+    # --- Текущий список учеников ---
     students = load_students()
     if not students:
         st.info("Пока нет учеников.")

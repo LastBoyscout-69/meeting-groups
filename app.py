@@ -284,13 +284,17 @@ if mode == "🧩 Собрать группы":
                 st.divider()
                 st.subheader("📥 Экспорт результата")
                 df_export = pd.DataFrame(export_data)
-                csv = df_export.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-
+                
+                # Формируем Excel-файл
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                    df_export.to_excel(writer, index=False, sheet_name='Группы')
+                
                 st.download_button(
-                    label="⬇️ Скачать группы в CSV",
-                    data=csv,
-                    file_name="groups_result.csv",
-                    mime="text/csv",
+                    label="⬇️ Скачать группы в Excel",
+                    data=buffer.getvalue(),
+                    file_name="groups_result.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     type="primary"
                 )
 

@@ -1,9 +1,11 @@
 import os
+import io
 import pandas as pd
 import streamlit as st
-from dashboard import render_dashboard
+
 from models import Student, DAYS, LANGUAGES, TIMEZONES
 from grouping import group_students, find_best_splits
+from dashboard import render_dashboard
 
 CSV_PATH = "students.csv"
 
@@ -38,15 +40,18 @@ def load_students() -> list[Student]:
 
 def save_students(students: list[Student]):
     df = pd.DataFrame([s.to_dict() for s in students])
-    # Сохраняем в CSV для совместимости
     df.to_csv(CSV_PATH, index=False, encoding="utf-8-sig")
-# Вкладки
+
+
+st.set_page_config(page_title="Группы учеников", page_icon="📚", layout="wide")
+st.title("📚 Сборка групп учеников")
 
 mode = st.radio(
     "Режим",
     ["➕ Добавить ученика", "📋 Все ученики", "🧩 Собрать группы", "📊 Дашборд"],
     horizontal=True,
 )
+
 if mode == "➕ Добавить ученика":
     with st.form("add_student", clear_on_submit=True):
         col1, col2 = st.columns(2)
@@ -67,26 +72,30 @@ if mode == "➕ Добавить ученика":
                 students = load_students()
                 students.append(Student(name, city, district, grade, language, days, timezone))
                 save_students(students)
+                st.session_state.saved_groups = None
                 st.success(f"✅ {name} добавлен(а).")
 
 if mode == "📋 Все ученики":
-    st.subheader("📂 Импорт учеников из Excel")
-
-    # Загрузка файла Excel
-    uploaded_file = st.file_uploader("Выберите файл формата .xlsx или .csv", type=["xlsx", "csv"])
+    # Выравниваем заголовок и кнопку загрузки в одну строку
+    col_title, col_upload = st.columns([2, 1])
+    with col_title:
+        st.subheader("📂 Импорт учеников из Excel")
+    with col_upload:
+        uploaded_file = st.file_uploader(
+            "Загрузить", type=["xlsx", "csv"], label_visibility="collapsed"
+        )
 
     if uploaded_file is not None:
-        if st.button("Загрузить этих учеников в базу"):
+        if st.button("📥 Загрузить этих учеников в базу"):
             try:
-                # Читаем в зависимости от расширения
                 if uploaded_file.name.endswith(".xlsx"):
                     df_new = pd.read_excel(uploaded_file, dtype={"grade": int})
                 else:
                     df_new = pd.read_csv(uploaded_file, dtype={"grade": int}, encoding="utf-8-sig")
-
+                
                 current_students = load_students()
                 added_count = 0
-
+                
                 for _, row in df_new.iterrows():
                     days = [d.strip() for d in str(row["days"]).split(",") if d.strip()]
                     current_students.append(Student(
@@ -99,7 +108,7 @@ if mode == "📋 Все ученики":
                         timezone=str(row["timezone"]).strip(),
                     ))
                     added_count += 1
-
+                
                 save_students(current_students)
                 st.session_state.saved_groups = None
                 st.success(f"✅ Успешно добавлено {added_count} учеников!")
@@ -131,42 +140,43 @@ if mode == "📋 Все ученики":
             },
         )
 
-        if st.button("💾 Сохранить изменения", type="primary"):
-            new_students = []
-            for _, row in edited.iterrows():
-                if pd.isna(row["name"]) or str(row["name"]).strip() == "":
-                    continue
-                days = [d.strip() for d in str(row["days"]).split(",") if d.strip()]
-                new_students.append(Student(
-                    name=str(row["name"]).strip(),
-                    city=str(row["city"]).strip(),
-                    district=str(row["district"]).strip(),
-                    grade=int(row["grade"]),
-                    language=str(row["language"]).strip(),
-                    days=days,
-                    timezone=str(row["timezone"]).strip(),
-                ))
-            save_students(new_students)
-            st.session_state.saved_groups = None
-            st.session_state.saved_splits = {}
-            st.success(f"✅ Сохранено учеников: {len(new_students)}")
-            st.rerun()
+        col_save, col_download = st.columns(2)
+        
+        with col_save:
+            if st.button("💾 Сохранить изменения", type="primary", use_container_width=True):
+                new_students = []
+                for _, row in edited.iterrows():
+                    if pd.isna(row["name"]) or str(row["name"]).strip() == "":
+                        continue
+                    days = [d.strip() for d in str(row["days"]).split(",") if d.strip()]
+                    new_students.append(Student(
+                        name=str(row["name"]).strip(),
+                        city=str(row["city"]).strip(),
+                        district=str(row["district"]).strip(),
+                        grade=int(row["grade"]),
+                        language=str(row["language"]).strip(),
+                        days=days,
+                        timezone=str(row["timezone"]).strip(),
+                    ))
+                save_students(new_students)
+                st.session_state.saved_groups = None
+                st.session_state.saved_splits = {}
+                st.success(f"✅ Сохранено учеников: {len(new_students)}")
+                st.rerun()
+                
+        with col_download:
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Ученики')
+            
+            st.download_button(
+                label="⬇️ Скачать список в Excel",
+                data=buffer.getvalue(),
+                file_name="students_backup.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
 
-        # --- Кнопка скачивания в Excel ---
-        st.divider()
-
-        # Формируем Excel-файл в памяти
-        import io
-        buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='Ученики')
-
-        st.download_button(
-            label="⬇️ Скачать список учеников в Excel",
-            data=buffer.getvalue(),
-            file_name="students_backup.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
 if mode == "🧩 Собрать группы":
     students = load_students()
     if not students:
@@ -178,20 +188,17 @@ if mode == "🧩 Собрать группы":
         with col2:
             strict_grade = st.checkbox("Строго по классу", value=True)
 
-        # Кнопка сохранения групп в память
         if st.button("🧩 Собрать группы", type="primary"):
             groups = group_students(students, strict_district, strict_grade)
             for g in groups:
                 g["tz_warning"] = len(g.get("timezones", [])) > 1
-
+            
             st.session_state.saved_groups = groups
             st.session_state.saved_splits = {}
             st.rerun()
 
-        # Отрисовка из памяти (если группы уже собраны)
         if st.session_state.saved_groups is not None:
             groups = st.session_state.saved_groups
-
             ok = [g for g in groups if g["status"] == "ok"]
             bad = [g for g in groups if g["status"] == "conflict"]
 
@@ -206,7 +213,7 @@ if mode == "🧩 Собрать группы":
                         title = f"**{g['city']} / {g['district']} / {g['grade']} кл. / {g['language']}**"
                         if g["tz_warning"]:
                             title += " ⚠️ (разные часовые пояса)"
-
+                        
                         st.markdown(title)
                         st.write(f"📅 Дни: {', '.join(g['days'])}")
                         st.write(f"👥 Участники: {', '.join(g['students'])}")
@@ -227,16 +234,16 @@ if mode == "🧩 Собрать группы":
                 for idx, g in enumerate(bad):
                     with st.container(border=True):
                         title = f"**{g['city']} / {g['district']} / {g['grade']} кл. / {g['language']}**"
-
+                        
                         warnings = []
                         if not g["days"]:
                             warnings.append("нет общего дня")
                         if g["tz_warning"]:
                             warnings.append("разные часовые пояса")
-
+                            
                         if warnings:
                             title += f" <br><span style='color: #ff4b4b; font-size: 1.1em;'>⚠️ Причина: {', '.join(warnings)}</span>"
-
+                        
                         st.markdown(title, unsafe_allow_html=True)
                         st.write(f"👥 Участники: {', '.join(g['students'])}")
 
@@ -256,7 +263,7 @@ if mode == "🧩 Собрать группы":
                                 for i, sub in enumerate(splits, 1):
                                     sub_members = [s for s in students if s.name in sub["students"]]
                                     tz = sub_members[0].timezone if sub_members else ""
-
+                                    
                                     st.info(
                                         f"**Подгруппа {i}** — дни: {', '.join(sub['days'])} | Участники: {', '.join(sub['students'])}\n\n"
                                         f"*Причина:* один город, один часовой пояс ({tz}), общие дни."
